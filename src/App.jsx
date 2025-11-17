@@ -5,34 +5,17 @@ import QueuePanel from './components/QueuePanel';
 import ThroughputCard from './components/ThroughputCard';
 import { saveQueue, loadQueue } from './utils/indexeddb';
 
-interface Scan {
-  id: string;
-  fileName: string;
-  imageData: string | null;
-  status: 'queued' | 'processing' | 'done';
-  triageLevel: string | null;
-  confidence: number | null;
-  heatmapData: any[] | null;
-  uploadedAt: string;
-}
-
-interface Stats {
-  processed: number;
-  avgTimeMs: number;
-  timeSavedEstimate: number;
-}
-
 function App() {
-  const [scans, setScans] = useState<Scan[]>([]);
-  const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
+  const [scans, setScans] = useState([]);
+  const [selectedScanId, setSelectedScanId] = useState(null);
   const [humanitarianMode, setHumanitarianMode] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  const [stats, setStats] = useState<Stats>({
+  const [stats, setStats] = useState({
     processed: 0,
     avgTimeMs: 0,
     timeSavedEstimate: 0,
   });
-  const workerRef = useRef<Worker | null>(null);
+  const workerRef = useRef(null);
 
   // Initialize worker
   useEffect(() => {
@@ -131,18 +114,18 @@ function App() {
   }, []);
 
   // Handle file upload
-  const handleFilesAdded = (files: File[]) => {
+  const handleFilesAdded = (files) => {
     const newScans = files.map((file) => {
       const reader = new FileReader();
       const scanId = `scan-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       reader.onload = (e) => {
-        const imageData = e.target?.result as string;
+        const imageData = e.target.result;
         
         setScans((prev) =>
           prev.map((scan) =>
             scan.id === scanId
-              ? { ...scan, imageData, status: 'processing' as const }
+              ? { ...scan, imageData, status: 'processing' }
               : scan
           )
         );
@@ -163,7 +146,7 @@ function App() {
         id: scanId,
         fileName: file.name,
         imageData: null,
-        status: 'queued' as const,
+        status: 'queued',
         triageLevel: null,
         confidence: null,
         heatmapData: null,
@@ -181,11 +164,10 @@ function App() {
 
   // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
+    const handleKeyPress = (e) => {
       // U: open uploader (focus file input)
       if (e.key === 'u' || e.key === 'U') {
-        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-        fileInput?.click();
+        document.querySelector('input[type="file"]')?.click();
       }
       // H: toggle humanitarian mode
       if (e.key === 'h' || e.key === 'H') {
