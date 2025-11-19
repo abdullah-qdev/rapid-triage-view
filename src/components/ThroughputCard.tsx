@@ -6,10 +6,9 @@ interface Stats {
 
 interface ThroughputCardProps {
   stats: Stats;
-  humanitarianMode: boolean;
 }
 
-function ThroughputCard({ stats, humanitarianMode }: ThroughputCardProps) {
+function ThroughputCard({ stats }: ThroughputCardProps) {
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -41,10 +40,7 @@ function ThroughputCard({ stats, humanitarianMode }: ThroughputCardProps) {
         {/* Time Saved Estimate */}
         <div className="pt-4 border-t border-border">
           <div className="text-xs text-muted-foreground mb-1">
-            Est. Time Saved{' '}
-            {humanitarianMode && (
-              <span className="text-primary font-semibold">(Humanitarian)</span>
-            )}
+            Est. Time Saved (AI vs Manual)
           </div>
           <div className="text-2xl font-semibold text-accent">
             {formatTime(stats.timeSavedEstimate)}
@@ -57,18 +53,16 @@ function ThroughputCard({ stats, humanitarianMode }: ThroughputCardProps) {
         {/* Model Speed Indicator */}
         <div className="bg-secondary/50 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-foreground">Model Speed</span>
+            <span className="text-xs font-semibold text-foreground">Real-Time Processing</span>
             <span className="text-xs text-primary font-bold">
-              {humanitarianMode ? '⚡ Fast' : '⚙️ Normal'}
+              ⚡ Live
             </span>
           </div>
           
           {/* Simple "sparkline" using CSS */}
           <div className="flex items-end gap-0.5 h-8">
             {[...Array(20)].map((_, i) => {
-              const height = humanitarianMode 
-                ? Math.random() * 0.4 + 0.6 // High activity
-                : Math.random() * 0.5 + 0.3; // Moderate activity
+              const height = Math.random() * 0.5 + 0.4;
               return (
                 <div
                   key={i}
@@ -82,7 +76,7 @@ function ThroughputCard({ stats, humanitarianMode }: ThroughputCardProps) {
       </div>
 
       <div className="mt-4 text-[10px] text-muted-foreground">
-        💡 Humanitarian mode optimizes for rapid crisis response with faster processing
+        💡 Real inference with ONNX model + AI-powered analysis via Gemini
       </div>
     </div>
   );
