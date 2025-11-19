@@ -57,6 +57,54 @@ All colors MUST be HSL.
     --sidebar-foreground: 210 20% 15%;
     --sidebar-border: 210 15% 88%;
   }
+
+  .dark {
+    --background: 210 20% 8%;
+    --foreground: 210 10% 95%;
+
+    --card: 210 20% 10%;
+    --card-foreground: 210 10% 95%;
+
+    --popover: 210 20% 10%;
+    --popover-foreground: 210 10% 95%;
+
+    --primary: 210 70% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 20% 15%;
+    --secondary-foreground: 210 10% 95%;
+
+    --muted: 210 20% 15%;
+    --muted-foreground: 210 10% 60%;
+
+    --accent: 210 70% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Triage colors - slightly adjusted for dark mode */
+    --critical: 0 84% 65%;
+    --critical-foreground: 0 0% 100%;
+
+    --urgent: 25 95% 58%;
+    --urgent-foreground: 0 0% 100%;
+
+    --stable: 45 93% 63%;
+    --stable-foreground: 210 20% 10%;
+
+    --non-urgent: 210 10% 55%;
+    --non-urgent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 20% 20%;
+    --input: 210 20% 20%;
+    --ring: 210 70% 50%;
+
+    /* Queue sidebar */
+    --sidebar-background: 210 20% 12%;
+    --sidebar-foreground: 210 10% 95%;
+    --sidebar-border: 210 20% 20%;
+  }
 }
 
 @layer base {
