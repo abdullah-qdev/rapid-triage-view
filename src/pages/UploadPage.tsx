@@ -299,28 +299,28 @@ export default function UploadPage() {
   const selectedScan = scans.find((s) => s.id === selectedScanId);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-border px-8 py-6 shadow-sm">
+      <header className="bg-card/50 backdrop-blur-sm border-b border-border/50 px-8 py-6 shadow-lg animate-fade-in mt-20">
         <div className="max-w-screen-2xl mx-auto flex items-center justify-between flex-wrap gap-6">
-          <div className="space-y-1">
-            <span className="text-sm font-semibold text-orange-600 tracking-wide">
+          <div className="space-y-2">
+            <span className="text-sm font-semibold bg-gradient-to-r from-primary to-orange-500 bg-clip-text text-transparent tracking-wide">
               Humanitarian Radiology AI
             </span>
 
-            <h1 className="text-3xl font-bold text-gray-900 leading-tight">
-              Offline Multi-Modal Radiology Triage
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
+              Radiology Triage Workspace
             </h1>
 
-            <p className="text-sm text-gray-600">
-              AI-powered medical imaging prioritization for humanitarian response
+            <p className="text-sm text-muted-foreground">
+              Upload, analyze, and prioritize medical scans with AI assistance
             </p>
           </div>
 
           <div className="flex gap-4">
             {isOffline && (
-              <div className="bg-red-100 text-red-700 px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 border border-red-300">
-                <span className="w-2 h-2 bg-red-700 rounded-full animate-pulse"></span>
+              <div className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-5 py-2.5 rounded-full font-semibold text-sm flex items-center gap-2 border-2 border-red-300 dark:border-red-700 shadow-lg animate-pulse">
+                <span className="w-2.5 h-2.5 bg-red-700 dark:bg-red-400 rounded-full"></span>
                 Offline Mode
               </div>
             )}
@@ -329,29 +329,34 @@ export default function UploadPage() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col lg:flex-row max-w-screen-2xl mx-auto w-full gap-6 p-6">
+      <main className="flex-1 flex flex-col lg:flex-row max-w-screen-2xl mx-auto w-full gap-6 p-6 animate-fade-in">
         <div className="lg:w-80 flex flex-col gap-6">
-          <Uploader onFilesAdded={handleFilesAdded} />
-          <ThroughputCard stats={stats} />
+          <div className="animate-scale-in">
+            <Uploader onFilesAdded={handleFilesAdded} />
+          </div>
+          <div className="animate-scale-in animation-delay-100">
+            <ThroughputCard stats={stats} />
+          </div>
 
-          <div className="bg-card border border-border rounded-lg p-4">
-            <h3 className="font-semibold text-sm mb-2 text-foreground">
+          <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl p-5 shadow-lg animate-scale-in animation-delay-200">
+            <h3 className="font-semibold text-sm mb-3 text-foreground flex items-center gap-2">
+              <span className="w-2 h-2 bg-primary rounded-full"></span>
               Keyboard Shortcuts
             </h3>
-            <div className="text-xs text-muted-foreground space-y-1">
-              <div>
-                <kbd className="bg-muted px-1.5 py-0.5 rounded">U</kbd> Open
-                uploader
+            <div className="text-xs text-muted-foreground space-y-2">
+              <div className="flex items-center gap-2">
+                <kbd className="bg-muted px-2 py-1 rounded font-mono border border-border">U</kbd>
+                <span>Open uploader</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 min-h-[500px]">
+        <div className="flex-1 min-h-[500px] animate-fade-in animation-delay-100">
           <Viewer scan={selectedScan} />
         </div>
 
-        <div className="lg:w-80">
+        <div className="lg:w-80 animate-fade-in animation-delay-200">
           <QueuePanel
             scans={scans}
             selectedScanId={selectedScanId}
@@ -363,8 +368,9 @@ export default function UploadPage() {
         </div>
       </main>
 
-      <footer className="bg-card border-t border-border px-6 py-3 text-center text-xs text-muted-foreground">
-        Datathon MVP Demo • Offline-capable • For demonstration purposes only
+      <footer className="bg-card/50 backdrop-blur-sm border-t border-border/50 px-6 py-4 text-center text-xs text-muted-foreground shadow-lg">
+        <p>Datathon MVP Demo • Offline-capable • For demonstration purposes only</p>
+        <p className="mt-1 text-muted-foreground/70">Powered by ONNX Runtime Web & Google Gemini AI</p>
       </footer>
     </div>
   );
