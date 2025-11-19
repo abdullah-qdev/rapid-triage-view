@@ -114,92 +114,77 @@ npm run preview
 
 ---
 
-## 🔧 Converting to Real Inference
+## 🔧 Using Real ML Models (ONNX Inference)
 
-### Current Implementation (v2.0)
-The `src/workers/inference.worker.js` now includes **ONNX Runtime Web** integration with:
-- Real model loading from `public/models/triage-model.onnx`
-- Image preprocessing pipeline with tensor conversion
-- Medical image normalization (adaptable for CT/X-ray/MRI)
-- Fallback to simulation when no model is present
+**⚠️ Important Change**: All simulation code has been **removed**. This application now requires a **real ONNX model** to perform triage inference.
 
-🟢 **Production Ready**: Just add your trained ONNX model!
+### Model Requirements
 
-### Quick Start: Add Your Trained Model
+- **Input Shape**: `[1, 3, 224, 224]` (Batch, RGB channels, Height, Width)
+- **Output Shape**: `[1, 4]` (4 triage classes)
+- **Classes**: CRITICAL, URGENT, STABLE, NON-URGENT (in order)
+- **Format**: ONNX (opset 11-17)
+- **File Location**: `public/models/triage-model.onnx`
 
-#### 1. **Export Your Model to ONNX**
+### Quick Start: Add Your Model
 
-**Option A: From PyTorch**
+#### 1. Export Your Trained Model to ONNX
+
+**From PyTorch:**
 ```python
 import torch
 import torch.onnx
 
-# Load your trained radiology triage model
-model = YourRadiologyModel()
-model.load_state_dict(torch.load('triage_model.pth'))
+# Load your trained model
+model = YourTriageModel()
+model.load_state_dict(torch.load('model.pth'))
 model.eval()
 
-# Create dummy input (adjust dimensions to match your model)
-dummy_input = torch.randn(1, 3, 224, 224)  # [batch, channels, height, width]
-
 # Export to ONNX
+dummy_input = torch.randn(1, 3, 224, 224)
 torch.onnx.export(
-    model,
-    dummy_input,
+    model, dummy_input,
     "triage-model.onnx",
-    export_params=True,
-    opset_version=14,
     input_names=['input'],
     output_names=['output'],
-    dynamic_axes={
-        'input': {0: 'batch_size'},
-        'output': {0: 'batch_size'}
-    }
+    opset_version=14
 )
 ```
 
-**Option B: From TensorFlow/Keras**
-```python
-import tf2onnx
-import tensorflow as tf
-
-# Load your trained model
-model = tf.keras.models.load_model('triage_model.h5')
-
-# Convert to ONNX
-spec = (tf.TensorSpec((None, 224, 224, 3), tf.float32, name="input"),)
-output_path = "triage-model.onnx"
-model_proto, _ = tf2onnx.convert.from_keras(
-    model, 
-    input_signature=spec, 
-    output_path=output_path
-)
+**From TensorFlow/Keras:**
+```bash
+pip install tf2onnx
+python -m tf2onnx.convert \
+  --saved-model /path/to/model \
+  --output triage-model.onnx \
+  --opset 14
 ```
 
-#### 2. **Place Model in Project**
+#### 2. Place Model in Project
 
 ```bash
-# Copy your model to the public directory
 cp triage-model.onnx public/models/triage-model.onnx
 ```
 
-The worker will automatically detect and load your model on first inference!
+#### 3. Reload Application
 
-#### 3. **Configure Model Settings**
+The worker automatically loads the model on first inference. No code changes needed!
 
-Update `src/workers/inference.worker.js` based on your model:
+### Customize for Your Model
+
+Edit `src/workers/inference.worker.js` if your model differs:
 
 ```javascript
-// Adjust preprocessing for your model's input size
-const inputTensor = await preprocessImage(imageDataURL, 224); // Change 224 to your size
+const MODEL_CONFIG = {
+  path: '/models/your-model.onnx',     // Change filename
+  inputSize: 256,                       // Change input resolution
+  classes: ['CLASS_A', 'CLASS_B', ...]  // Your class labels
+};
 
-// Update input/output names (check with Netron: https://netron.app)
-const feeds = { input: inputTensor };  // Match your model's input name
-const output = results.output;         // Match your model's output name
-
-// Map model outputs to triage levels
-// Adjust based on your model's class order
-const triageMapping = ['CRITICAL', 'URGENT', 'STABLE', 'NON-URGENT'];
+const NORMALIZATION = {
+  mean: [0.5, 0.5, 0.5],  // Your model's normalization
+  std: [0.5, 0.5, 0.5]
+};
 ```
 
 ### Advanced Integration
