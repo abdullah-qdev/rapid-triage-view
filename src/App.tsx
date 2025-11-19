@@ -5,6 +5,13 @@ import QueuePanel from "./components/QueuePanel";
 import ThroughputCard from "./components/ThroughputCard";
 import { saveQueue, loadQueue } from "./utils/indexeddb";
 
+interface AIReasoning {
+  explanation: string;
+  keyFindings: string[];
+  recommendations: string[];
+  confidenceAnalysis: string;
+}
+
 interface Scan {
   id: string;
   fileName: string;
@@ -14,6 +21,10 @@ interface Scan {
   confidence: number | null;
   heatmapData: any[] | null;
   uploadedAt: string;
+  aiReasoning?: AIReasoning;
+  customNotes?: string;
+  reasoningLoading?: boolean;
+  reasoningError?: string;
 }
 
 interface Stats {
@@ -25,7 +36,7 @@ interface Stats {
 function App() {
   const [scans, setScans] = useState<Scan[]>([]);
   const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
-  const [humanitarianMode, setHumanitarianMode] = useState(false);
+  const [selectedScanIds, setSelectedScanIds] = useState<Set<string>>(new Set());
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [stats, setStats] = useState<Stats>({
     processed: 0,
@@ -43,7 +54,25 @@ function App() {
     );
 
     workerRef.current.onmessage = (e) => {
-      const { scanId, result, processingTime } = e.data;
+      const { scanId, result, error, processingTime } = e.data;
+
+      if (error) {
+        // Handle worker errors
+        setScans((prev) =>
+          prev.map((scan) =>
+            scan.id === scanId
+              ? {
+                  ...scan,
+                  status: "done",
+                  triageLevel: "ERROR",
+                  confidence: 0,
+                  heatmapData: [],
+                }
+              : scan
+          )
+        );
+        return;
+      }
 
       setScans((prev) =>
         prev.map((scan) =>
@@ -59,14 +88,15 @@ function App() {
         )
       );
 
+      // Auto-trigger AI reasoning analysis
+      fetchAIReasoning(scanId, result);
+
       // Update stats
       setStats((prev) => {
         const newProcessed = prev.processed + 1;
         const newAvg =
           (prev.avgTimeMs * prev.processed + processingTime) / newProcessed;
-        const timeSaved = humanitarianMode
-          ? newProcessed * 45 // Estimate 45 seconds saved per scan in humanitarian mode
-          : newProcessed * 30; // 30 seconds saved in normal mode
+        const timeSaved = newProcessed * 30; // Estimate 30 seconds saved per scan
 
         return {
           processed: newProcessed,
@@ -86,7 +116,6 @@ function App() {
             workerRef.current.postMessage({
               scanId: scan.id,
               imageData: scan.imageData,
-              humanitarianMode,
             });
           }
         });
@@ -100,15 +129,104 @@ function App() {
     };
   }, []);
 
-  // Update worker's humanitarian mode
-  useEffect(() => {
-    if (workerRef.current) {
-      workerRef.current.postMessage({
-        type: "setHumanitarianMode",
-        enabled: humanitarianMode,
+  // AI Reasoning fetch function
+  const fetchAIReasoning = async (scanId: string, result: any) => {
+    // Mark as loading
+    setScans((prev) =>
+      prev.map((scan) =>
+        scan.id === scanId ? { ...scan, reasoningLoading: true } : scan
+      )
+    );
+
+    try {
+      const scan = scans.find((s) => s.id === scanId);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-scan`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            triageLevel: result.triageLevel,
+            confidence: result.confidence,
+            heatmapData: result.heatmapData,
+            fileName: scan?.fileName,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`AI analysis failed: ${response.status}`);
+      }
+
+      const reasoning = await response.json();
+
+      setScans((prev) =>
+        prev.map((scan) =>
+          scan.id === scanId
+            ? { ...scan, aiReasoning: reasoning, reasoningLoading: false }
+            : scan
+        )
+      );
+    } catch (error) {
+      console.error("Failed to fetch AI reasoning:", error);
+      setScans((prev) =>
+        prev.map((scan) =>
+          scan.id === scanId
+            ? {
+                ...scan,
+                reasoningError:
+                  error instanceof Error ? error.message : "Analysis failed",
+                reasoningLoading: false,
+              }
+            : scan
+        )
+      );
+    }
+  };
+
+  // Batch processing
+  const handleBatchProcess = () => {
+    const queuedScans = scans.filter(
+      (scan) => selectedScanIds.has(scan.id) && scan.status === "queued"
+    );
+
+    queuedScans.forEach((scan) => {
+      setScans((prev) =>
+        prev.map((s) =>
+          s.id === scan.id ? { ...s, status: "processing" } : s
+        )
+      );
+
+      workerRef.current?.postMessage({
+        scanId: scan.id,
+        imageData: scan.imageData,
+      });
+    });
+
+    // Clear selection after processing
+    setSelectedScanIds(new Set());
+  };
+
+  // Update custom notes
+  const handleUpdateNotes = (scanId: string, notes: string) => {
+    setScans((prev) =>
+      prev.map((scan) =>
+        scan.id === scanId ? { ...scan, customNotes: notes } : scan
+      )
+    );
+  };
+
+  // Regenerate AI reasoning
+  const handleRegenerateReasoning = (scanId: string) => {
+    const scan = scans.find((s) => s.id === scanId);
+    if (scan && scan.triageLevel && scan.confidence !== null) {
+      fetchAIReasoning(scanId, {
+        triageLevel: scan.triageLevel,
+        confidence: scan.confidence,
+        heatmapData: scan.heatmapData,
       });
     }
-  }, [humanitarianMode]);
+  };
 
   // Persist queue to IndexedDB whenever it changes
   useEffect(() => {
@@ -155,7 +273,6 @@ function App() {
           workerRef.current.postMessage({
             scanId,
             imageData,
-            humanitarianMode,
           });
         }
       };
@@ -192,10 +309,6 @@ function App() {
         ) as HTMLInputElement;
         fileInput?.click();
       }
-      // H: toggle humanitarian mode
-      if (e.key === "h" || e.key === "H") {
-        setHumanitarianMode((prev) => !prev);
-      }
     };
 
     window.addEventListener("keypress", handleKeyPress);
@@ -227,25 +340,17 @@ function App() {
           </div>
 
           {/* Right Section — Toggles */}
-          <div className="flex items-center gap-4">
-            {/* Humanitarian Mode Toggle */}
-            <label className="flex items-center gap-3 cursor-pointer bg-gray-100 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-200 transition">
-              <input
-                type="checkbox"
-                checked={humanitarianMode}
-                onChange={(e) => setHumanitarianMode(e.target.checked)}
-                className="w-5 h-5 accent-orange-600 cursor-pointer"
-                aria-label="Toggle humanitarian mode"
-              />
-              <div>
-                <div className="font-semibold text-sm text-gray-900">
-                  Humanitarian Mode
-                </div>
-                <div className="text-xs text-gray-500">
-                  Optimized for crisis response
-                </div>
+          <div className="flex gap-4">
+            {/* Offline Indicator */}
+            {isOffline && (
+              <div className="bg-red-100 text-red-700 px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 border border-red-300">
+                <span className="w-2 h-2 bg-red-700 rounded-full animate-pulse"></span>
+                Offline Mode
               </div>
-            </label>
+            )}
+          </div>
+        </div>
+      </header>
 
             {/* Offline Indicator */}
             {isOffline && (
@@ -263,7 +368,7 @@ function App() {
         {/* Left: Uploader + Throughput */}
         <div className="lg:w-80 flex flex-col gap-6">
           <Uploader onFilesAdded={handleFilesAdded} />
-          <ThroughputCard stats={stats} humanitarianMode={humanitarianMode} />
+          <ThroughputCard stats={stats} />
 
           {/* Help Panel */}
           <div className="bg-card border border-border rounded-lg p-4">
@@ -274,10 +379,6 @@ function App() {
               <div>
                 <kbd className="bg-muted px-1.5 py-0.5 rounded">U</kbd> Open
                 uploader
-              </div>
-              <div>
-                <kbd className="bg-muted px-1.5 py-0.5 rounded">H</kbd> Toggle
-                humanitarian mode
               </div>
             </div>
           </div>
@@ -293,7 +394,10 @@ function App() {
           <QueuePanel
             scans={scans}
             selectedScanId={selectedScanId}
+            selectedScanIds={selectedScanIds}
             onSelectScan={setSelectedScanId}
+            onToggleSelect={setSelectedScanIds}
+            onBatchProcess={handleBatchProcess}
           />
         </div>
       </main>

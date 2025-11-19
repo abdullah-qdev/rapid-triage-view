@@ -1,5 +1,12 @@
 import { useState } from 'react';
 
+interface AIReasoning {
+  explanation: string;
+  keyFindings: string[];
+  recommendations: string[];
+  confidenceAnalysis: string;
+}
+
 interface Scan {
   id: string;
   fileName: string;
@@ -9,14 +16,22 @@ interface Scan {
   confidence: number | null;
   heatmapData: any[] | null;
   uploadedAt: string;
+  aiReasoning?: AIReasoning;
+  customNotes?: string;
+  reasoningLoading?: boolean;
+  reasoningError?: string;
 }
 
 interface ViewerProps {
   scan?: Scan;
+  onUpdateNotes?: (scanId: string, notes: string) => void;
+  onRegenerateReasoning?: (scanId: string) => void;
 }
 
-function Viewer({ scan }: ViewerProps) {
+function Viewer({ scan, onUpdateNotes, onRegenerateReasoning }: ViewerProps) {
   const [showHeatmap, setShowHeatmap] = useState(true);
+  const [heatmapIntensity, setHeatmapIntensity] = useState(0.7);
+  const [notes, setNotes] = useState('');
 
   if (!scan) {
     return (
@@ -57,8 +72,15 @@ function Viewer({ scan }: ViewerProps) {
     }
   };
 
+  const handleNotesChange = (value: string) => {
+    setNotes(value);
+    if (onUpdateNotes) {
+      onUpdateNotes(scan.id, value);
+    }
+  };
+
   return (
-    <div className="bg-card border border-border rounded-lg h-full flex flex-col">
+    <div className="bg-card border border-border rounded-lg h-full flex flex-col overflow-hidden">
       {/* Header */}
       <div className="border-b border-border p-4 flex items-center justify-between flex-wrap gap-4">
         <div>
@@ -88,9 +110,57 @@ function Viewer({ scan }: ViewerProps) {
               Processing...
             </div>
           )}
+        </div>
+      </div>
 
-          {/* Heatmap Toggle */}
-          {scan.status === 'done' && (
+      {/* Main Content Area - Scrollable */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Image Viewer */}
+        <div className="p-4 flex items-center justify-center bg-muted/30 relative min-h-[300px]">
+          {scan.imageData ? (
+            <div className="relative max-w-full">
+              <img
+                src={scan.imageData}
+                alt={scan.fileName}
+                className="max-w-full max-h-[500px] rounded-lg shadow-lg"
+              />
+
+              {/* Heatmap Overlay */}
+              {scan.status === 'done' && showHeatmap && scan.heatmapData && (
+                <svg
+                  className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                  style={{ opacity: heatmapIntensity }}
+                >
+                  <defs>
+                    {scan.heatmapData.map((spot, idx) => (
+                      <radialGradient key={idx} id={`heatmap-${idx}`}>
+                        <stop offset="0%" stopColor={spot.color} stopOpacity="0.8" />
+                        <stop offset="50%" stopColor={spot.color} stopOpacity="0.4" />
+                        <stop offset="100%" stopColor={spot.color} stopOpacity="0" />
+                      </radialGradient>
+                    ))}
+                  </defs>
+                  {scan.heatmapData.map((spot, idx) => (
+                    <ellipse
+                      key={idx}
+                      cx={`${spot.x}%`}
+                      cy={`${spot.y}%`}
+                      rx={`${spot.radius}%`}
+                      ry={`${spot.radius}%`}
+                      fill={`url(#heatmap-${idx})`}
+                    />
+                  ))}
+                </svg>
+              )}
+            </div>
+          ) : (
+            <div className="text-muted-foreground text-sm">No image data available</div>
+          )}
+        </div>
+
+        {/* Heatmap Controls */}
+        {scan.status === 'done' && (
+          <div className="px-4 pb-4 border-b border-border space-y-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -101,60 +171,150 @@ function Viewer({ scan }: ViewerProps) {
               />
               <span className="text-sm font-medium text-foreground">Show Heatmap</span>
             </label>
-          )}
-        </div>
-      </div>
-
-      {/* Image Viewer */}
-      <div className="flex-1 p-4 flex items-center justify-center bg-muted/30 relative overflow-hidden">
-        {scan.imageData ? (
-          <div className="relative max-w-full max-h-full">
-            <img
-              src={scan.imageData}
-              alt={scan.fileName}
-              className="max-w-full max-h-[calc(100vh-300px)] object-contain rounded-lg shadow-lg"
-            />
-
-            {/* Faux Heatmap Overlay */}
-            {showHeatmap && scan.heatmapData && scan.status === 'done' && (
-              <div className="absolute inset-0 pointer-events-none rounded-lg overflow-hidden">
-                {scan.heatmapData.map((spot, idx) => (
-                  <div
-                    key={idx}
-                    className="absolute"
-                    style={{
-                      left: `${spot.x}%`,
-                      top: `${spot.y}%`,
-                      width: `${spot.radius}%`,
-                      height: `${spot.radius}%`,
-                      background: `radial-gradient(circle, ${spot.color}88 0%, ${spot.color}44 40%, transparent 70%)`,
-                      transform: 'translate(-50%, -50%)',
-                      animation: 'pulse 2s ease-in-out infinite',
-                    }}
-                  ></div>
-                ))}
+            
+            {showHeatmap && (
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-muted-foreground whitespace-nowrap">
+                  Intensity:
+                </label>
+                <input
+                  type="range"
+                  min="0.3"
+                  max="0.9"
+                  step="0.1"
+                  value={heatmapIntensity}
+                  onChange={(e) => setHeatmapIntensity(parseFloat(e.target.value))}
+                  className="flex-1 accent-primary"
+                  aria-label="Heatmap intensity"
+                />
+                <span className="text-sm text-muted-foreground w-12">
+                  {Math.round(heatmapIntensity * 100)}%
+                </span>
               </div>
             )}
           </div>
-        ) : (
-          <div className="text-muted-foreground text-sm">Loading image...</div>
         )}
-      </div>
 
-      {/* Footer Info */}
-      {scan.status === 'done' && (
-        <div className="border-t border-border p-4 bg-secondary/50">
-          <div className="text-xs text-muted-foreground">
-            <p className="mb-1">
-              <strong className="text-foreground">AI Analysis Complete:</strong> This scan has been
-              automatically prioritized based on detected patterns.
-            </p>
-            <p className="text-[10px] opacity-75">
-              ⚠️ For demonstration purposes only. Not for clinical use.
+        {/* AI Reasoning Panel */}
+        {scan.status === 'done' && (
+          <div className="p-4 border-b border-border space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-md font-semibold text-foreground flex items-center gap-2">
+                <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                AI Analysis
+              </h3>
+              {onRegenerateReasoning && (
+                <button
+                  onClick={() => onRegenerateReasoning(scan.id)}
+                  disabled={scan.reasoningLoading}
+                  className="text-xs px-3 py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary font-medium transition disabled:opacity-50"
+                >
+                  {scan.reasoningLoading ? 'Analyzing...' : 'Regenerate'}
+                </button>
+              )}
+            </div>
+
+            {scan.reasoningLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                Generating AI analysis...
+              </div>
+            )}
+
+            {scan.reasoningError && (
+              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                {scan.reasoningError}
+              </div>
+            )}
+
+            {scan.aiReasoning && !scan.reasoningLoading && (
+              <div className="space-y-4">
+                {/* Explanation */}
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                    Clinical Explanation
+                  </h4>
+                  <p className="text-sm text-foreground leading-relaxed">
+                    {scan.aiReasoning.explanation}
+                  </p>
+                </div>
+
+                {/* Key Findings */}
+                <div>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                    Key Findings
+                  </h4>
+                  <ul className="space-y-1">
+                    {scan.aiReasoning.keyFindings.map((finding, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
+                        <span className="text-primary mt-1">•</span>
+                        <span>{finding}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Recommendations */}
+                <div>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                    Recommended Actions
+                  </h4>
+                  <ul className="space-y-2">
+                    {scan.aiReasoning.recommendations.map((rec, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm">
+                        <span className={`mt-0.5 ${
+                          scan.triageLevel === 'CRITICAL' ? 'text-critical' :
+                          scan.triageLevel === 'URGENT' ? 'text-urgent' : 'text-stable'
+                        }`}>
+                          {scan.triageLevel === 'CRITICAL' || scan.triageLevel === 'URGENT' ? '🔴' : '🟡'}
+                        </span>
+                        <span className="text-foreground">{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Confidence Analysis */}
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                  <h4 className="text-xs font-semibold text-primary uppercase mb-2">
+                    Confidence Analysis
+                  </h4>
+                  <p className="text-sm text-foreground leading-relaxed">
+                    {scan.aiReasoning.confidenceAnalysis}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Custom Notes */}
+        {scan.status === 'done' && (
+          <div className="p-4 space-y-3">
+            <h3 className="text-md font-semibold text-foreground flex items-center gap-2">
+              <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Radiologist Notes
+            </h3>
+            <textarea
+              value={notes || scan.customNotes || ''}
+              onChange={(e) => {
+                setNotes(e.target.value);
+                handleNotesChange(e.target.value);
+              }}
+              placeholder="Add your observations, patient context, or override AI suggestions..."
+              className="w-full min-h-[100px] p-3 rounded-lg border border-border bg-background text-foreground text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-label="Custom notes for this scan"
+            />
+            <p className="text-xs text-muted-foreground">
+              Notes auto-save and will be included in exported reports
             </p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

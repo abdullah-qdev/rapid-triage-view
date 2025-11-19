@@ -1,5 +1,12 @@
 import { useState } from 'react';
 
+interface AIReasoning {
+  explanation: string;
+  keyFindings: string[];
+  recommendations: string[];
+  confidenceAnalysis: string;
+}
+
 interface Scan {
   id: string;
   fileName: string;
@@ -9,16 +16,40 @@ interface Scan {
   confidence: number | null;
   heatmapData: any[] | null;
   uploadedAt: string;
+  aiReasoning?: AIReasoning;
+  customNotes?: string;
 }
 
 interface QueuePanelProps {
   scans: Scan[];
   selectedScanId: string | null;
+  selectedScanIds: Set<string>;
   onSelectScan: (id: string) => void;
+  onToggleSelect: (ids: Set<string>) => void;
+  onBatchProcess: () => void;
 }
 
-function QueuePanel({ scans, selectedScanId, onSelectScan }: QueuePanelProps) {
+function QueuePanel({ scans, selectedScanId, selectedScanIds, onSelectScan, onToggleSelect, onBatchProcess }: QueuePanelProps) {
   const [exportMessage, setExportMessage] = useState('');
+
+  const handleToggleSelect = (scanId: string) => {
+    const newSet = new Set(selectedScanIds);
+    if (newSet.has(scanId)) {
+      newSet.delete(scanId);
+    } else {
+      newSet.add(scanId);
+    }
+    onToggleSelect(newSet);
+  };
+
+  const handleSelectAll = () => {
+    const queuedScans = scans.filter(s => s.status === 'queued');
+    onToggleSelect(new Set(queuedScans.map(s => s.id)));
+  };
+
+  const handleDeselectAll = () => {
+    onToggleSelect(new Set());
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -59,6 +90,8 @@ function QueuePanel({ scans, selectedScanId, onSelectScan }: QueuePanelProps) {
         status: scan.status,
         triageLevel: scan.triageLevel,
         confidence: scan.confidence,
+        aiAnalysis: scan.aiReasoning || null,
+        radiologistNotes: scan.customNotes || null,
       })),
     };
 
@@ -89,6 +122,34 @@ function QueuePanel({ scans, selectedScanId, onSelectScan }: QueuePanelProps) {
           {scans.length} scan{scans.length !== 1 ? 's' : ''} •{' '}
           {scans.filter((s) => s.status === 'done').length} processed
         </p>
+        
+        {/* Batch Controls */}
+        {scans.filter(s => s.status === 'queued').length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              onClick={handleSelectAll}
+              className="text-xs px-2 py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary font-medium transition"
+            >
+              Select All Queued
+            </button>
+            {selectedScanIds.size > 0 && (
+              <>
+                <button
+                  onClick={handleDeselectAll}
+                  className="text-xs px-2 py-1 rounded bg-muted hover:bg-muted/80 text-muted-foreground font-medium transition"
+                >
+                  Deselect All
+                </button>
+                <button
+                  onClick={onBatchProcess}
+                  className="text-xs px-3 py-1 rounded bg-primary hover:bg-primary/90 text-primary-foreground font-semibold transition"
+                >
+                  Process Selected ({selectedScanIds.size})
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Queue List */}
@@ -101,20 +162,31 @@ function QueuePanel({ scans, selectedScanId, onSelectScan }: QueuePanelProps) {
         ) : (
           <div className="space-y-2">
             {scans.map((scan) => (
-              <button
-                key={scan.id}
-                onClick={() => onSelectScan(scan.id)}
-                className={`
-                  w-full p-3 rounded-lg border-2 text-left transition-all
-                  hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary
-                  ${
-                    selectedScanId === scan.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-transparent bg-card hover:border-border'
-                  }
-                `}
-                aria-label={`Select scan ${scan.fileName}`}
-              >
+              <div key={scan.id} className="flex gap-2 items-start">
+                {/* Checkbox for batch selection */}
+                {scan.status === 'queued' && (
+                  <input
+                    type="checkbox"
+                    checked={selectedScanIds.has(scan.id)}
+                    onChange={() => handleToggleSelect(scan.id)}
+                    className="mt-3 w-4 h-4 accent-primary cursor-pointer flex-shrink-0"
+                    aria-label={`Select ${scan.fileName} for batch processing`}
+                  />
+                )}
+                
+                <button
+                  onClick={() => onSelectScan(scan.id)}
+                  className={`
+                    flex-1 p-3 rounded-lg border-2 text-left transition-all
+                    hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary
+                    ${
+                      selectedScanId === scan.id
+                        ? 'border-primary bg-primary/5'
+                        : 'border-transparent bg-card hover:border-border'
+                    }
+                  `}
+                  aria-label={`Select scan ${scan.fileName}`}
+                >
                 <div className="flex gap-3">
                   {/* Thumbnail */}
                   <div className="w-16 h-16 bg-muted rounded flex-shrink-0 overflow-hidden">
@@ -176,7 +248,8 @@ function QueuePanel({ scans, selectedScanId, onSelectScan }: QueuePanelProps) {
                     )}
                   </div>
                 </div>
-              </button>
+                </button>
+              </div>
             ))}
           </div>
         )}
