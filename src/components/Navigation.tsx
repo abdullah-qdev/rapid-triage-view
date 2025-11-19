@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Home, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Navigation() {
   const location = useLocation();
@@ -39,6 +40,10 @@ export default function Navigation() {
             Triage Scans
           </Link>
         </Button>
+        
+        <div className="w-px h-6 bg-border/50 mx-1" />
+        
+        <ThemeToggle />
       </div>
     </nav>
   );
