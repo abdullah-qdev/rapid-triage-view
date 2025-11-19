@@ -352,17 +352,6 @@ function App() {
         </div>
       </header>
 
-            {/* Offline Indicator */}
-            {isOffline && (
-              <div className="bg-red-100 text-red-700 px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 border border-red-300">
-                <span className="w-2 h-2 bg-red-700 rounded-full animate-pulse"></span>
-                Offline Mode
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="flex-1 flex flex-col lg:flex-row max-w-screen-2xl mx-auto w-full gap-6 p-6">
         {/* Left: Uploader + Throughput */}
